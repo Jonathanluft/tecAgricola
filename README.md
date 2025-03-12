@@ -1,2 +1,1 @@
-# Cap-1---Play-na-sua-carreira-em-IA
-Cap 1 - Play na sua carreira em IA
+Se voce esta lendo isso, deu certo
