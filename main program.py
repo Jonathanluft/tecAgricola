@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
+# In[ ]:
 
 
 import math
@@ -36,14 +36,15 @@ def cadastrar_dados():
     
     #batata 5L/1m de fertilizante de fosfato forma da area: QUADRADO
     #5 ruas para pulverizar com trator
-    quantidade_insumo_batata_total = quantidade_insumo_batata_aplicacao * 5
     quantidade_insumo_batata_aplicacao = (math.sqrt(area) * 5)/1000
+    quantidade_insumo_batata_total = quantidade_insumo_batata_aplicacao * 5
+    
     
     #morango 2.5L/1m inseticida Organofosforado forma da area: quadrado
     #5 ruas para pulverizar com trator
-    quantidade_insumo_morango_total = quantidade_insumo_morango_aplicacao * 5
     quantidade_insumo_morango_aplicacao = (math.sqrt(area)* 2.5)/1000
-    
+    quantidade_insumo_morango_total = quantidade_insumo_morango_aplicacao * 5
+   
     
     #saidas
     if cultura == 1:
@@ -121,6 +122,11 @@ def atualizar_registro():
     logs[idx]["quant_aplicacao_morango"] = logs[idx]["quant_insumo_morango"] / 5
 
     print("Registro atualizado com sucesso!")
+    
+def remover_registro():
+    logs.pop(int(input("\nDigite o número do registro que deseja remover: "))) 
+    
+    print('\nRegistro removido!')
 
 def main():
     """
@@ -131,7 +137,8 @@ def main():
         print("1. Registrar novos dados")
         print("2. Exibir registros (Saída de dados)")
         print("3. Atualizar um registro")
-        print("4. Sair do programa")
+        print("4. Remover registro")
+        print("5. Sair do programa")
         opcao = input("Escolha uma opção: ")
 
         if opcao == "1":
@@ -143,6 +150,8 @@ def main():
         elif opcao == "3":
             atualizar_registro()
         elif opcao == "4":
+            remover_registro()
+        elif opcao == "5":
             print("Encerrando o programa...")
             break
         else:
