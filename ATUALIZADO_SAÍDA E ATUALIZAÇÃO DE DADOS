@@ -1,0 +1,147 @@
+import math
+
+# Lista global para armazenar os registros (logs) acumulados
+logs = []
+
+def cadastrar_dados():
+    """
+    Realiza a entrada de dados, efetua cálculos e retorna um dicionário com os registros.
+    """
+    # Entrada da área
+    while True:
+        try:
+            area = int(input('Insira a área em metros quadrados da plantação (somente números): '))
+            break
+        except ValueError:
+            resposta1 = int(input('Valor inválido. Aperte 0 para tentar novamente ou 1 para sair: '))
+            if resposta1 == 1:
+                return None
+
+    # Entrada da cultura
+    while True:
+        try:
+            cultura = int(input('Escolha a cultura: 1 - Batata | 2 - Morango: '))
+            if cultura in [1, 2]:
+                break
+        except ValueError:
+            resposta2 = int(input('Valor inválido. Aperte 0 para tentar novamente ou 1 para sair: '))
+            if resposta2 == 1:
+                return None
+
+    print("\nDados registrados com sucesso!")
+    print(f"Área: {area} m²")
+    cultura_str = "Batata" if cultura == 1 else "Morango"
+    print(f"Cultura: {cultura_str}")
+
+    # Cálculos para insumos
+    quantidade_insumo_batata = (math.sqrt(area) * 0.7) * 2
+    quantidade_por_aplicacao_batata = quantidade_insumo_batata / 5
+    quantidade_insumo_morango = (math.sqrt(area) * 0.45) * 2
+    quantidade_por_aplicacao_morango = quantidade_insumo_morango / 5
+
+    print("Quantidade insumo Batata:", quantidade_insumo_batata)
+    print("Quantidade por aplicação Batata:", quantidade_por_aplicacao_batata)
+    print("Quantidade insumo Morango:", quantidade_insumo_morango)
+    print("Quantidade por aplicação Morango:", quantidade_por_aplicacao_morango)
+
+    # Cria o registro como um dicionário
+    registro = {
+        "area": area,
+        "cultura": cultura,
+        "quant_insumo_batata": quantidade_insumo_batata,
+        "quant_aplicacao_batata": quantidade_por_aplicacao_batata,
+        "quant_insumo_morango": quantidade_insumo_morango,
+        "quant_aplicacao_morango": quantidade_por_aplicacao_morango
+    }
+    return registro
+
+def exibir_logs():
+    """
+    Exibe os registros acumulados com formatação.
+    """
+    if not logs:
+        print("\nNenhum registro disponível.")
+    else:
+        print("\nRegistros acumulados:")
+        for idx, reg in enumerate(logs):
+            cultura_str = "Batata" if reg["cultura"] == 1 else "Morango"
+            print(f"\nRegistro {idx}:")
+            print(f"  Área: {reg['area']} m²")
+            print(f"  Cultura: {cultura_str}")
+            print(f"  Insumo Batata: {reg['quant_insumo_batata']}")
+            print(f"  Aplicação Batata: {reg['quant_aplicacao_batata']}")
+            print(f"  Insumo Morango: {reg['quant_insumo_morango']}")
+            print(f"  Aplicação Morango: {reg['quant_aplicacao_morango']}")
+
+def atualizar_registro():
+    """
+    Permite atualizar um registro específico (área e cultura) e recalcula os insumos.
+    """
+    if not logs:
+        print("\nNenhum registro para atualizar.")
+        return
+
+    exibir_logs()
+    try:
+        idx = int(input("\nDigite o número do registro que deseja atualizar: "))
+        if idx < 0 or idx >= len(logs):
+            print("Registro inválido.")
+            return
+    except ValueError:
+        print("Entrada inválida.")
+        return
+
+    # Atualizando os dados do registro
+    try:
+        nova_area = int(input("Digite a nova área (somente números): "))
+    except ValueError:
+        print("Entrada inválida para área.")
+        return
+
+    try:
+        nova_cultura = int(input("Digite a nova opção para cultura (1 - Batata, 2 - Morango): "))
+        if nova_cultura not in [1, 2]:
+            print("Opção inválida para cultura.")
+            return
+    except ValueError:
+        print("Entrada inválida para cultura.")
+        return
+
+    # Atualiza os valores e recalcula os insumos
+    logs[idx]["area"] = nova_area
+    logs[idx]["cultura"] = nova_cultura
+    logs[idx]["quant_insumo_batata"] = (math.sqrt(nova_area) * 0.7) * 2
+    logs[idx]["quant_aplicacao_batata"] = logs[idx]["quant_insumo_batata"] / 5
+    logs[idx]["quant_insumo_morango"] = (math.sqrt(nova_area) * 0.45) * 2
+    logs[idx]["quant_aplicacao_morango"] = logs[idx]["quant_insumo_morango"] / 5
+
+    print("Registro atualizado com sucesso!")
+
+def main():
+    """
+    Menu principal para gerenciar o cadastro, exibição e atualização dos dados.
+    """
+    while True:
+        print("\nMenu Principal:")
+        print("1. Registrar novos dados")
+        print("2. Exibir registros (Saída de dados)")
+        print("3. Atualizar um registro")
+        print("4. Sair do programa")
+        opcao = input("Escolha uma opção: ")
+
+        if opcao == "1":
+            registro = cadastrar_dados()
+            if registro:
+                logs.append(registro)
+        elif opcao == "2":
+            exibir_logs()
+        elif opcao == "3":
+            atualizar_registro()
+        elif opcao == "4":
+            print("Encerrando o programa...")
+            break
+        else:
+            print("Opção inválida. Tente novamente.")
+
+if __name__ == "__main__":
+    main()
