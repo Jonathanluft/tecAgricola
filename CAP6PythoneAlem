@@ -1,28 +1,36 @@
 """
-Registro de Colheita – solução para a atividade de Agronegócio em Python.
+Registro de Colheita com ALERTA de estoque mínimo.
 
-Requisitos atendidos:
-* Funções e procedimentos com parâmetros
-* Estruturas de dados (lista, tupla, dicionário)
-* Arquivos TXT + JSON
-* Conexão Oracle (cap. 6)
+• Registra ENTRADA (colheita) e SAÍDA (venda/retirada).
+• Mantém histórico em colheitas.json.
+• Opcional: grava tudo em um banco Oracle (preencha as credenciais).
+• Avisa quando o saldo de um produto fica abaixo do limite definido.
 """
 
 import json, os, sys
 from datetime import date
 from typing import List, Dict
 
-# ----------- CONFIG ORACLE ----------- #
-ORACLE_USER = "system"          # << edite se necessário
-ORACLE_PASS = "oraclepw"        # << edite se necessário
-ORACLE_DSN  = "localhost/XEPDB1"  # << edite se necessário
-# ------------------------------------- #
+# ----------- CONFIG ORACLE (opcional) ----------- #
+ORACLE_USER = "system"          # 🖊️  edite se necessário
+ORACLE_PASS = "oraclepw"
+ORACLE_DSN  = "localhost/XEPDB1"
+# ------------------------------------------------ #
+
+# ----------- CONFIG ALERTA DE ESTOQUE ----------- #
+# Defina o mínimo aceitável em kg para cada produto
+ESTOQUE_MIN = {
+    "Alface": 10,
+    "Tomate": 20,
+    "Cenoura": 15
+}
+# ------------------------------------------------ #
 
 JSON_FILE = "colheitas.json"
 TXT_FILE  = "boas_praticas.txt"
-CAMPOS    = ("DATA", "TIPO", "QTD_KG", "PRECO_KG")  # tupla (cap. 4)
+CAMPOS    = ("DATA", "TIPO", "QTD_KG", "PRECO_KG", "OPERACAO")  # tupla
 
-# -------------- UTIL -------------- #
+# -------------- UTILIDADES JSON -------------- #
 def ler_json() -> List[Dict]:
     if not os.path.exists(JSON_FILE):
         return []
@@ -33,16 +41,18 @@ def salvar_json(dados: List[Dict]):
     with open(JSON_FILE, "w", encoding="utf-8") as f:
         json.dump(dados, f, ensure_ascii=False, indent=2)
 
+# -------------- BANCO ORACLE (opcional) -------------- #
 def inserir_oracle(reg: Dict):
-    """Insere o registro no Oracle; avisa caso o driver não esteja configurado."""
+    """Insere o registro no Oracle; se cx_Oracle faltar, apenas avisa."""
     try:
         import cx_Oracle
         conn = cx_Oracle.connect(ORACLE_USER, ORACLE_PASS, ORACLE_DSN, encoding="UTF-8")
         cur  = conn.cursor()
         cur.execute(
-            "INSERT INTO COLHEITAS (DATA_C, TIPO, QUANTIDADE_KG, PRECO_KG) "
-            "VALUES (:1,:2,:3,:4)",
-            (reg["DATA"], reg["TIPO"], reg["QTD_KG"], reg["PRECO_KG"])
+            """INSERT INTO COLHEITAS
+               (DATA_C, TIPO, QUANTIDADE_KG, PRECO_KG, OPERACAO)
+               VALUES (:1,:2,:3,:4,:5)""",
+            (reg["DATA"], reg["TIPO"], reg["QTD_KG"], reg["PRECO_KG"], reg["OPERACAO"])
         )
         conn.commit()
         conn.close()
@@ -51,6 +61,7 @@ def inserir_oracle(reg: Dict):
     except Exception as e:
         print(f"⚠️  Erro Oracle: {e}")
 
+# -------------- VALIDAÇÃO -------------- #
 def validar_float(msg: str) -> float:
     while True:
         try:
@@ -58,43 +69,66 @@ def validar_float(msg: str) -> float:
         except ValueError:
             print("Digite número válido!")
 
-# -------- FUNÇÕES PRINCIPAIS -------- #
-def registrar():
+# -------------- REGISTROS -------------- #
+def registrar(operacao: str):
+    """operacao = 'ENTRADA' ou 'SAIDA'."""
     tipo = input("Tipo (ex.: alface, tomate): ").strip().title()
     qtd  = validar_float("Quantidade (kg): ")
     preco= validar_float("Preço por kg (R$): ")
-    reg  = {CAMPOS[0]: date.today().isoformat(),
-            CAMPOS[1]: tipo,
-            CAMPOS[2]: qtd,
-            CAMPOS[3]: preco}
+    reg  = {
+        CAMPOS[0]: date.today().isoformat(),
+        CAMPOS[1]: tipo,
+        CAMPOS[2]: qtd,
+        CAMPOS[3]: preco,
+        CAMPOS[4]: operacao
+    }
     dados = ler_json()
     dados.append(reg)
     salvar_json(dados)
     inserir_oracle(reg)
-    print("✅ Colheita registrada!\n")
+    print("✅ Registro salvo!\n")
+    verificar_alerta(tipo)  # checa estoque logo após salvar
 
-def listar():
+# -------------- RELATÓRIOS -------------- #
+def saldo_atual() -> Dict[str, float]:
+    dados = ler_json()
+    tot: Dict[str, float] = {}
+    for r in dados:
+        sinal = 1 if r["OPERACAO"] == "ENTRADA" else -1
+        tot[r["TIPO"]] = tot.get(r["TIPO"], 0) + sinal * r["QTD_KG"]
+    return tot
+
+def listar_historico():
     dados = ler_json()
     if not dados:
         print("Sem registros ainda.\n")
         return
-    print("\n--- HISTÓRICO DE COLHEITAS ---")
+    print("\n--- HISTÓRICO ---")
     for r in dados:
-        print(f"{r['DATA']} | {r['TIPO']:<10} | {r['QTD_KG']:>6.2f} kg | "
+        sinal = "+" if r["OPERACAO"] == "ENTRADA" else "-"
+        print(f"{r['DATA']} | {r['TIPO']:<10} | {sinal}{r['QTD_KG']:>6.2f} kg | "
               f"R$ {r['PRECO_KG']:>6.2f}")
     print()
 
-def saldo():
-    dados = ler_json()
-    totais = {}
-    for r in dados:
-        totais[r["TIPO"]] = totais.get(r["TIPO"], 0) + r["QTD_KG"]
+def mostrar_saldo():
+    sal = saldo_atual()
+    if not sal:
+        print("Sem registros ainda.\n")
+        return
     print("\n--- SALDO (kg) ---")
-    for t, q in totais.items():
+    for t, q in sal.items():
         print(f"{t:<10}: {q:.2f}")
     print()
 
-# ------------- MENU ------------- #
+# -------------- ALERTA -------------- #
+def verificar_alerta(tipo: str):
+    sal = saldo_atual()
+    minimo = ESTOQUE_MIN.get(tipo)
+    if minimo is not None and sal.get(tipo, 0) < minimo:
+        print(f"⚠️  ALERTA: Estoque de {tipo} abaixo do mínimo "
+              f"({sal.get(tipo,0):.2f} kg < {minimo} kg)\n")
+
+# -------------- MENU -------------- #
 def mostrar_boas_praticas():
     if os.path.exists(TXT_FILE):
         with open(TXT_FILE, "r", encoding="utf-8") as f:
@@ -103,17 +137,27 @@ def mostrar_boas_praticas():
 
 def menu():
     mostrar_boas_praticas()
-    opcoes = {"1": registrar, "2": listar, "3": saldo}
     while True:
-        print("1) Registrar colheita\n2) Listar histórico\n3) Ver saldo\n0) Sair")
+        print("1) Registrar ENTRADA (colheita)")
+        print("2) Registrar SAÍDA (venda/retirada)")
+        print("3) Listar histórico")
+        print("4) Ver saldo")
+        print("0) Sair")
         escolha = input("> ").strip()
-        if escolha == "0":
+        if escolha == "1":
+            registrar("ENTRADA")
+        elif escolha == "2":
+            registrar("SAIDA")
+        elif escolha == "3":
+            listar_historico()
+        elif escolha == "4":
+            mostrar_saldo()
+        elif escolha == "0":
             sys.exit()
-        func = opcoes.get(escolha)
-        if func:
-            func()
         else:
             print("Opção inválida.\n")
 
 if __name__ == "__main__":
     menu()
+
+    
