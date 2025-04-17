@@ -1,0 +1,119 @@
+"""
+Registro de Colheita – solução simples para a atividade de Agronegócio em Python.
+
+Requisitos atendidos:
+* Funções e procedimentos com parâmetros
+* Estruturas de dados (lista, tupla, dicionário)
+* Arquivos TXT + JSON
+* Conexão Oracle (cap. 6)
+"""
+
+import json, os, sys
+from datetime import date
+from typing import List, Dict
+
+# ----------- CONFIG ORACLE ----------- #
+ORACLE_USER = "system"          # << edite se necessário
+ORACLE_PASS = "oraclepw"        # << edite se necessário
+ORACLE_DSN  = "localhost/XEPDB1"  # << edite se necessário
+# ------------------------------------- #
+
+JSON_FILE = "colheitas.json"
+TXT_FILE  = "boas_praticas.txt"
+CAMPOS    = ("DATA", "TIPO", "QTD_KG", "PRECO_KG")  # tupla (cap. 4)
+
+# -------------- UTIL -------------- #
+def ler_json() -> List[Dict]:
+    if not os.path.exists(JSON_FILE):
+        return []
+    with open(JSON_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def salvar_json(dados: List[Dict]):
+    with open(JSON_FILE, "w", encoding="utf-8") as f:
+        json.dump(dados, f, ensure_ascii=False, indent=2)
+
+def inserir_oracle(reg: Dict):
+    """Insere o registro no Oracle; avisa caso o driver não esteja configurado."""
+    try:
+        import cx_Oracle
+        conn = cx_Oracle.connect(ORACLE_USER, ORACLE_PASS, ORACLE_DSN, encoding="UTF-8")
+        cur  = conn.cursor()
+        cur.execute(
+            "INSERT INTO COLHEITAS (DATA_C, TIPO, QUANTIDADE_KG, PRECO_KG) "
+            "VALUES (:1,:2,:3,:4)",
+            (reg["DATA"], reg["TIPO"], reg["QTD_KG"], reg["PRECO_KG"])
+        )
+        conn.commit()
+        conn.close()
+    except ModuleNotFoundError:
+        print("⚠️  cx_Oracle não instalado – pulando gravação no banco.")
+    except Exception as e:
+        print(f"⚠️  Erro Oracle: {e}")
+
+def validar_float(msg: str) -> float:
+    while True:
+        try:
+            return float(input(msg).replace(",", "."))
+        except ValueError:
+            print("Digite número válido!")
+
+# -------- FUNÇÕES PRINCIPAIS -------- #
+def registrar():
+    tipo = input("Tipo (ex.: alface, tomate): ").strip().title()
+    qtd  = validar_float("Quantidade (kg): ")
+    preco= validar_float("Preço por kg (R$): ")
+    reg  = {CAMPOS[0]: date.today().isoformat(),
+            CAMPOS[1]: tipo,
+            CAMPOS[2]: qtd,
+            CAMPOS[3]: preco}
+    dados = ler_json()
+    dados.append(reg)
+    salvar_json(dados)
+    inserir_oracle(reg)
+    print("✅ Colheita registrada!\n")
+
+def listar():
+    dados = ler_json()
+    if not dados:
+        print("Sem registros ainda.\n")
+        return
+    print("\n--- HISTÓRICO DE COLHEITAS ---")
+    for r in dados:
+        print(f"{r['DATA']} | {r['TIPO']:<10} | {r['QTD_KG']:>6.2f} kg | "
+              f"R$ {r['PRECO_KG']:>6.2f}")
+    print()
+
+def saldo():
+    dados = ler_json()
+    totais = {}
+    for r in dados:
+        totais[r["TIPO"]] = totais.get(r["TIPO"], 0) + r["QTD_KG"]
+    print("\n--- SALDO (kg) ---")
+    for t, q in totais.items():
+        print(f"{t:<10}: {q:.2f}")
+    print()
+
+# ------------- MENU ------------- #
+def mostrar_boas_praticas():
+    if os.path.exists(TXT_FILE):
+        with open(TXT_FILE, "r", encoding="utf-8") as f:
+            print(f.read())
+            print("---\n")
+
+def menu():
+    mostrar_boas_praticas()
+    opcoes = {"1": registrar, "2": listar, "3": saldo}
+    while True:
+        print("1) Registrar colheita\n2) Listar histórico\n3) Ver saldo\n0) Sair")
+        escolha = input("> ").strip()
+        if escolha == "0":
+            sys.exit()
+        func = opcoes.get(escolha)
+        if func:
+            func()
+        else:
+            print("Opção inválida.\n")
+
+if __name__ == "__main__":
+    menu()
